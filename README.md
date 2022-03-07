@@ -1,5 +1,8 @@
 # markstruct
 
+![Tests](https://github.com/herbygillot/markstruct/actions/workflows/test.yml/badge.svg?branch=master)
+[![Coverage Status](https://coveralls.io/repos/github/herbygillot/markstruct/badge.svg?branch=master)](https://coveralls.io/github/herbygillot/markstruct?branch=master)
+
 > markstruct converts a struct's string fields from Markdown to HTML in-place.
 
 `markstruct` scans a struct for tagged fields of relevant type (`string`, `*string`, `[]string` & maps with `string` values), and renders the field value from Markdown to HTML in-place. That is to say the value of each field itself will be changed within the struct to be the HTML result of rendering the original value as Markdown.
