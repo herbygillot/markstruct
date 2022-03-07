@@ -13,4 +13,8 @@ jobs:
         go-version: ${{ matrix.go-version }}
     - uses: actions/checkout@v3
     - run: go vet ./...
-    - run: go test -v ./...
+    - run: go test -v  -coverprofile=covprofile ./...
+    - name: Send coverage
+      uses: shogo82148/actions-goveralls@v1
+      with:
+        path-to-profile: covprofile
