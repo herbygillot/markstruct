@@ -56,3 +56,5 @@
   fmt.Println(doc.Title) // "<p>Doc <em>1</em></p>"
   fmt.Println(doc.Body)  // "<p>This is <em>emphasis</em>.</p>"
   ```
+
+There are equivalent functions, `ValidateFields` and `ValidateAllFields`, that can be used to check if errors would occur during conversion, making no changes to the target struct. They return the exact same values as `ConverFields` and `ConvertAllFields`, respectively.
