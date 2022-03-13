@@ -1,6 +1,7 @@
 # markstruct
 
 ![Tests](https://github.com/herbygillot/markstruct/actions/workflows/test.yml/badge.svg?branch=master)
+[![Docs](https://godoc.org/github.com/herbygillot/markstruct?status.svg=)](https://pkg.go.dev/github.com/herbygillot/markstruct)
 [![Coverage Status](https://coveralls.io/repos/github/herbygillot/markstruct/badge.svg?branch=master)](https://coveralls.io/github/herbygillot/markstruct?branch=master)
 
 > markstruct converts a struct's string fields from Markdown to HTML in-place.
