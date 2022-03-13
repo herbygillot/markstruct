@@ -35,6 +35,14 @@ func (e *ExplodingMarkdown) Convert(_ []byte, _ io.Writer, _ ...parser.ParseOpti
 	return errors.New("BOOM")
 }
 
+func isInvalidType(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	return errors.Is(err, ErrInvalidType)
+}
+
 func TestConvertNil(t *testing.T) {
 	changed, err := ConvertFields(nil)
 	assert.False(t, changed)
@@ -58,43 +66,43 @@ func TestConvertInvalidTypes(t *testing.T) {
 
 	changed, err := ConvertFields(mystr)
 	assert.False(t, changed)
-	assert.ErrorIs(t, ErrInvalidType, err)
+	assert.True(t, isInvalidType(err))
 	assert.Equal(t, "", mystr)
 
 	changed, err = ConvertFields(&mystr)
 	assert.False(t, changed)
-	assert.ErrorIs(t, ErrInvalidType, err)
+	assert.True(t, isInvalidType(err))
 	assert.Equal(t, "", mystr)
 
 	var mylist []string
 
 	changed, err = ConvertFields(mylist)
 	assert.False(t, changed)
-	assert.ErrorIs(t, ErrInvalidType, err)
+	assert.True(t, isInvalidType(err))
 	assert.Nil(t, mylist)
 
 	changed, err = ConvertFields(&mylist)
 	assert.False(t, changed)
-	assert.ErrorIs(t, ErrInvalidType, err)
+	assert.True(t, isInvalidType(err))
 	assert.Nil(t, mylist)
 
 	mylist = []string{}
 
 	changed, err = ConvertFields(mylist)
 	assert.False(t, changed)
-	assert.ErrorIs(t, ErrInvalidType, err)
+	assert.True(t, isInvalidType(err))
 	assert.Equal(t, []string{}, mylist)
 
 	changed, err = ConvertFields(&mylist)
 	assert.False(t, changed)
-	assert.ErrorIs(t, ErrInvalidType, err)
+	assert.True(t, isInvalidType(err))
 	assert.Equal(t, []string{}, mylist)
 
 	mystruct := MyStruct{}
 
 	changed, err = ConvertFields(mystruct) // should be pointer
 	assert.False(t, changed)
-	assert.ErrorIs(t, ErrInvalidType, err)
+	assert.True(t, isInvalidType(err))
 	assert.Equal(t, MyStruct{}, mystruct)
 }
 
@@ -605,4 +613,96 @@ func TestValidateAllFieldsWithError(t *testing.T) {
 	changed, err = badconverter.ValidateAllFields(otherobj)
 	assert.False(t, changed)
 	assert.Error(t, err)
+}
+
+func TestConvertWronglyTypedFields(t *testing.T) {
+	type Something struct {
+		Name      string
+		Details   string
+		Activated bool `markdown:"on"` // wrong type, not a string
+		Level     int  `markdown:"on"` // wrong type, not a string
+	}
+
+	alpha1 := &Something{
+		Name:      "alpha",
+		Details:   "Highly *developed*",
+		Activated: true,
+		Level:     1,
+	}
+
+	changed, err := ConvertFields(alpha1)
+	assert.False(t, changed)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "alpha", alpha1.Name)
+	assert.Equal(t, "Highly *developed*", alpha1.Details)
+	assert.True(t, alpha1.Activated)
+	assert.Equal(t, 1, alpha1.Level)
+
+	changed, err = ConvertAllFields(alpha1)
+	assert.True(t, changed)
+	assert.NoError(t, err)
+
+	assert.Equal(t, "<p>alpha</p>\n", alpha1.Name)
+	assert.Equal(t, "<p>Highly <em>developed</em></p>\n", alpha1.Details)
+	assert.True(t, alpha1.Activated)
+	assert.Equal(t, 1, alpha1.Level)
+}
+
+func TestConvertMapValue(t *testing.T) {
+	fieldproc := makeFieldProcessor(defaultConverter.(*converter))
+
+	foo := "Hello World"
+
+	test := map[string]string{
+		"description": "Hello *World*!",
+	}
+
+	changed, err := fieldproc.convertMap(reflect.ValueOf(nil))
+	assert.False(t, changed)
+	assert.Error(t, err)
+	assert.True(t, isInvalidType(err))
+
+	changed, err = fieldproc.convertMap(reflect.ValueOf(foo))
+	assert.False(t, changed)
+	assert.Error(t, err)
+	assert.True(t, isInvalidType(err))
+
+	changed, err = fieldproc.convertMap(reflect.ValueOf([]string{}))
+	assert.False(t, changed)
+	assert.Error(t, err)
+	assert.True(t, isInvalidType(err))
+
+	changed, err = fieldproc.convertMap(reflect.ValueOf(test))
+	assert.False(t, changed) // false as direct map value is not settable
+	assert.NoError(t, err)
+	assert.Equal(t, "Hello *World*!", test["description"])
+}
+
+func TestConvertSliceValue(t *testing.T) {
+	fieldproc := makeFieldProcessor(defaultConverter.(*converter))
+
+	foo := "Hello World"
+
+	test := []string{"one", "two", "three"}
+
+	changed, err := fieldproc.convertSlice(reflect.ValueOf(nil))
+	assert.False(t, changed)
+	assert.Error(t, err)
+	assert.True(t, isInvalidType(err))
+
+	changed, err = fieldproc.convertSlice(reflect.ValueOf(foo))
+	assert.False(t, changed)
+	assert.Error(t, err)
+	assert.True(t, isInvalidType(err))
+
+	changed, err = fieldproc.convertSlice(reflect.ValueOf(map[string]string{}))
+	assert.False(t, changed)
+	assert.Error(t, err)
+	assert.True(t, isInvalidType(err))
+
+	changed, err = fieldproc.convertSlice(reflect.ValueOf(test))
+	assert.True(t, changed)
+	assert.NoError(t, err)
+	assert.Equal(t, "<p>one</p>\n", test[0])
 }

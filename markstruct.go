@@ -34,6 +34,7 @@ package markstruct
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"reflect"
 	"strings"
@@ -63,8 +64,8 @@ type converter struct {
 }
 
 type fieldProcessor struct {
-	convertAllFields bool
-	validateOnly     bool
+	ConvertAllFields bool
+	ValidateOnly     bool
 
 	converter    *converter
 	parseOptions []parser.ParseOption
@@ -77,7 +78,7 @@ var defaultConverter = WithMarkdown(goldmark.New())
 var (
 	// ErrInvalidType signifies that we have received a value of type other
 	// than the expected pointer to struct.
-	ErrInvalidType = errors.New("invalid type: must be pointer to struct")
+	ErrInvalidType = errors.New("invalid type")
 )
 
 // ConvertFields accepts a pointer to a struct, and will modify tagged
@@ -172,7 +173,7 @@ func (c *converter) process(s interface{}, allFields bool, validateOnly bool, op
 
 	objtype := reflect.TypeOf(s)
 	if objtype.Kind() != reflect.Ptr {
-		return false, ErrInvalidType
+		return false, fmt.Errorf("%w: expect pointer to struct", ErrInvalidType)
 	}
 
 	elem := objval.Elem()
@@ -180,12 +181,9 @@ func (c *converter) process(s interface{}, allFields bool, validateOnly bool, op
 		return false, nil
 	}
 
-	fieldproc := &fieldProcessor{
-		convertAllFields: allFields,
-		converter:        c,
-		parseOptions:     opts,
-		validateOnly:     validateOnly,
-	}
+	fieldproc := makeFieldProcessor(c, opts...)
+	fieldproc.ConvertAllFields = allFields
+	fieldproc.ValidateOnly = validateOnly
 
 	return fieldproc.convertStruct(elem)
 }
@@ -210,7 +208,7 @@ func (f *fieldProcessor) convert(v reflect.Value) (bool, error) {
 
 func (f *fieldProcessor) convertMap(v reflect.Value) (bool, error) {
 	if v.Kind() != reflect.Map {
-		return false, ErrInvalidType
+		return false, fmt.Errorf("%w: expect map", ErrInvalidType)
 	}
 
 	// only process maps with string values
@@ -235,7 +233,7 @@ func (f *fieldProcessor) convertMap(v reflect.Value) (bool, error) {
 		}
 
 		if rawstr != mdstr {
-			if !f.validateOnly {
+			if !f.ValidateOnly {
 				v.SetMapIndex(kval, reflect.ValueOf(mdstr))
 			}
 
@@ -248,7 +246,7 @@ func (f *fieldProcessor) convertMap(v reflect.Value) (bool, error) {
 
 func (f *fieldProcessor) convertSlice(v reflect.Value) (bool, error) {
 	if v.Kind() != reflect.Slice {
-		return false, ErrInvalidType
+		return false, fmt.Errorf("%w: expect string slice", ErrInvalidType)
 	}
 
 	var changed bool
@@ -269,7 +267,7 @@ func (f *fieldProcessor) convertSlice(v reflect.Value) (bool, error) {
 
 func (f *fieldProcessor) convertStruct(v reflect.Value) (bool, error) {
 	if v.Kind() != reflect.Struct {
-		return false, ErrInvalidType
+		return false, fmt.Errorf("%w: expect struct", ErrInvalidType)
 	}
 
 	var changed bool
@@ -280,7 +278,7 @@ func (f *fieldProcessor) convertStruct(v reflect.Value) (bool, error) {
 		field := v.Field(i)
 
 		if !isStruct(field) {
-			if !f.convertAllFields && !isStructFieldTagEnabled(v, i) {
+			if !f.ConvertAllFields && !isStructFieldTagEnabled(v, i) {
 				continue
 			}
 		}
@@ -307,7 +305,7 @@ func (f *fieldProcessor) convertString(v reflect.Value) (bool, error) {
 		return false, err
 	}
 
-	if !f.validateOnly {
+	if !f.ValidateOnly {
 		v.SetString(rendered)
 	}
 
@@ -369,4 +367,11 @@ func isStructFieldTagEnabled(structval reflect.Value, fieldIdx int) bool {
 
 func isValidSettable(v reflect.Value) bool {
 	return v.IsValid() && v.CanSet()
+}
+
+func makeFieldProcessor(c *converter, opts ...parser.ParseOption) *fieldProcessor {
+	return &fieldProcessor{
+		converter:    c,
+		parseOptions: opts,
+	}
 }
