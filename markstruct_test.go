@@ -467,3 +467,49 @@ func TestWithMarkdown(t *testing.T) {
 	assert.Equal(t, "<p>~~strike~~</p>\n", testDefault.Comment)
 	assert.Equal(t, "<p><del>strike</del></p>\n", testCustom.Comment)
 }
+
+func TestValidateFields(t *testing.T) {
+	plain := "Hello *World*"
+	converted := "<p>Hello <em>World</em></p>\n"
+
+	object1 := MyAnnotatedEnabledStruct{
+		Comment: plain,
+	}
+
+	object2 := object1
+
+	changed, err := ConvertFields(&object1)
+	assert.True(t, changed, err)
+	assert.NoError(t, err)
+
+	assert.Equal(t, converted, object1.Comment)
+
+	changed, err = ValidateFields(&object2)
+	assert.True(t, changed)
+	assert.NoError(t, err)
+
+	assert.Equal(t, plain, object2.Comment)
+}
+
+func TestValidateAllFields(t *testing.T) {
+	plain := "Hello *World*"
+	converted := "<p>Hello <em>World</em></p>\n"
+
+	object1 := MyAnnotatedDisabledStruct{
+		Comment: plain,
+	}
+
+	object2 := object1
+
+	changed, err := ConvertAllFields(&object1)
+	assert.True(t, changed, err)
+	assert.NoError(t, err)
+
+	assert.Equal(t, converted, object1.Comment)
+
+	changed, err = ValidateAllFields(&object2)
+	assert.True(t, changed)
+	assert.NoError(t, err)
+
+	assert.Equal(t, plain, object2.Comment)
+}

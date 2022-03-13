@@ -52,6 +52,10 @@ type FieldConverter interface {
 	ConvertFields(s interface{}, opts ...parser.ParseOption) (bool, error)
 
 	ConvertAllFields(s interface{}, opts ...parser.ParseOption) (bool, error)
+
+	ValidateFields(s interface{}, opts ...parser.ParseOption) (bool, error)
+
+	ValidateAllFields(s interface{}, opts ...parser.ParseOption) (bool, error)
 }
 
 type converter struct {
@@ -59,9 +63,11 @@ type converter struct {
 }
 
 type fieldProcessor struct {
-	converter        *converter
 	convertAllFields bool
-	parseOptions     []parser.ParseOption
+	validateOnly     bool
+
+	converter    *converter
+	parseOptions []parser.ParseOption
 }
 
 var _ FieldConverter = (*converter)(nil)
@@ -98,6 +104,16 @@ func ConvertFields(s interface{}, opts ...parser.ParseOption) (bool, error) {
 	return defaultConverter.ConvertFields(s, opts...)
 }
 
+// ValidateFields will, like ConvertFields, accept a pointer to a struct
+// whose string fields are expected to be tagged with `markdown:"on"`. Unlike
+// ConvertFields, ValidateFields makes no changes to the struct or its
+// fields.  ValidateFields returns the same values as ConvertFields:
+// a boolean indicating whether fields would have been changed, as well
+// as any error encountered.
+func ValidateFields(s interface{}, opts ...parser.ParseOption) (bool, error) {
+	return defaultConverter.ValidateFields(s, opts...)
+}
+
 // ConvertAllFields does the same as ConvertFields, except it will convert
 // all fields of relevant type within a struct, regardless of whether the
 // field is tagged with `markdown:"on"` or not.  ConvertAllFields also
@@ -114,6 +130,14 @@ func ConvertAllFields(s interface{}, opts ...parser.ParseOption) (bool, error) {
 	return defaultConverter.ConvertAllFields(s, opts...)
 }
 
+// ValidateAllFields behaves like ConvertAllFields, except that it makes no
+// changes to a struct.  ValidateAllFields can be used to test for errors
+// in a situation where ConvertAllFields would be used.  ValidateAllFields
+// returns the same return values as ConvertAllFields.
+func ValidateAllFields(s interface{}, opts ...parser.ParseOption) (bool, error) {
+	return defaultConverter.ValidateAllFields(s, opts...)
+}
+
 // WithMarkdown creates a FieldConverter from a custom `goldmark.Markdown` object.
 // Use this with `goldmark.New` to allow using markstruct with non-default `goldmark`
 // extensions or configuration.
@@ -124,14 +148,22 @@ func WithMarkdown(md goldmark.Markdown) FieldConverter {
 }
 
 func (c *converter) ConvertFields(s interface{}, opts ...parser.ParseOption) (bool, error) {
-	return c.process(s, false, opts...)
+	return c.process(s, false, false, opts...)
 }
 
 func (c *converter) ConvertAllFields(s interface{}, opts ...parser.ParseOption) (bool, error) {
-	return c.process(s, true, opts...)
+	return c.process(s, true, false, opts...)
 }
 
-func (c *converter) process(s interface{}, allFields bool, opts ...parser.ParseOption) (bool, error) {
+func (c *converter) ValidateFields(s interface{}, opts ...parser.ParseOption) (bool, error) {
+	return c.process(s, false, true, opts...)
+}
+
+func (c *converter) ValidateAllFields(s interface{}, opts ...parser.ParseOption) (bool, error) {
+	return c.process(s, true, true, opts...)
+}
+
+func (c *converter) process(s interface{}, allFields bool, validateOnly bool, opts ...parser.ParseOption) (bool, error) {
 	objval := reflect.ValueOf(s)
 
 	if !objval.IsValid() {
@@ -148,16 +180,14 @@ func (c *converter) process(s interface{}, allFields bool, opts ...parser.ParseO
 		return false, nil
 	}
 
-	fieldproc := c.makeProcessor(allFields, opts...)
-	return fieldproc.convertStruct(elem)
-}
-
-func (c *converter) makeProcessor(allFields bool, parseOpts ...parser.ParseOption) *fieldProcessor {
-	return &fieldProcessor{
-		converter:        c,
+	fieldproc := &fieldProcessor{
 		convertAllFields: allFields,
-		parseOptions:     parseOpts,
+		converter:        c,
+		parseOptions:     opts,
+		validateOnly:     validateOnly,
 	}
+
+	return fieldproc.convertStruct(elem)
 }
 
 func (f *fieldProcessor) convert(v reflect.Value) (bool, error) {
@@ -205,7 +235,10 @@ func (f *fieldProcessor) convertMap(v reflect.Value) (bool, error) {
 		}
 
 		if rawstr != mdstr {
-			v.SetMapIndex(kval, reflect.ValueOf(mdstr))
+			if !f.validateOnly {
+				v.SetMapIndex(kval, reflect.ValueOf(mdstr))
+			}
+
 			changed = true
 		}
 	}
@@ -274,7 +307,10 @@ func (f *fieldProcessor) convertString(v reflect.Value) (bool, error) {
 		return false, err
 	}
 
-	v.SetString(rendered)
+	if !f.validateOnly {
+		v.SetString(rendered)
+	}
+
 	return value != rendered, err
 }
 
