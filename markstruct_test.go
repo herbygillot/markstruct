@@ -1,6 +1,8 @@
 package markstruct
 
 import (
+	"errors"
+	"io"
 	"reflect"
 	"testing"
 
@@ -8,6 +10,7 @@ import (
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
 )
 
 type MyStruct struct {
@@ -20,6 +23,16 @@ type MyAnnotatedEnabledStruct struct {
 
 type MyAnnotatedDisabledStruct struct {
 	Comment string `markdown:"off"`
+}
+
+type ExplodingMarkdown struct {
+	goldmark.Markdown
+}
+
+var _ goldmark.Markdown = (*ExplodingMarkdown)(nil)
+
+func (e *ExplodingMarkdown) Convert(_ []byte, _ io.Writer, _ ...parser.ParseOption) error {
+	return errors.New("BOOM")
 }
 
 func TestConvertNil(t *testing.T) {
@@ -512,4 +525,84 @@ func TestValidateAllFields(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, plain, object2.Comment)
+}
+
+func TestConvertFieldsWithError(t *testing.T) {
+	badconverter := WithMarkdown(&ExplodingMarkdown{})
+
+	myobj := &MyAnnotatedEnabledStruct{
+		Comment: "Hello World",
+	}
+
+	changed, err := badconverter.ConvertFields(myobj)
+	assert.False(t, changed)
+	assert.Error(t, err)
+
+	otherobj := &MyAnnotatedDisabledStruct{
+		Comment: "Hello World",
+	}
+
+	changed, err = badconverter.ConvertFields(otherobj)
+	assert.False(t, changed)
+	assert.NoError(t, err)
+}
+
+func TestConvertAllFieldsWithError(t *testing.T) {
+	badconverter := WithMarkdown(&ExplodingMarkdown{})
+
+	myobj := &MyAnnotatedDisabledStruct{
+		Comment: "Hello World",
+	}
+
+	changed, err := badconverter.ConvertAllFields(myobj)
+	assert.False(t, changed)
+	assert.Error(t, err)
+
+	otherobj := &MyAnnotatedDisabledStruct{
+		Comment: "Hello World",
+	}
+
+	changed, err = badconverter.ConvertAllFields(otherobj)
+	assert.False(t, changed)
+	assert.Error(t, err)
+}
+
+func TestValidateFieldsWithError(t *testing.T) {
+	badconverter := WithMarkdown(&ExplodingMarkdown{})
+
+	myobj := &MyAnnotatedEnabledStruct{
+		Comment: "Hello World",
+	}
+
+	changed, err := badconverter.ValidateFields(myobj)
+	assert.False(t, changed)
+	assert.Error(t, err)
+
+	otherobj := &MyAnnotatedDisabledStruct{
+		Comment: "Hello World",
+	}
+
+	changed, err = badconverter.ValidateFields(otherobj)
+	assert.False(t, changed)
+	assert.NoError(t, err)
+}
+
+func TestValidateAllFieldsWithError(t *testing.T) {
+	badconverter := WithMarkdown(&ExplodingMarkdown{})
+
+	myobj := &MyAnnotatedEnabledStruct{
+		Comment: "Hello World",
+	}
+
+	changed, err := badconverter.ValidateAllFields(myobj)
+	assert.False(t, changed)
+	assert.Error(t, err)
+
+	otherobj := &MyAnnotatedDisabledStruct{
+		Comment: "Hello World",
+	}
+
+	changed, err = badconverter.ValidateAllFields(otherobj)
+	assert.False(t, changed)
+	assert.Error(t, err)
 }
