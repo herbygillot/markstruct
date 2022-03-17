@@ -6,7 +6,7 @@
 // say the value of each field itself will be changed within the struct to be the HTML
 // result of rendering the original field's value as Markdown.  markstruct targets
 // fields whose type are string, pointer to string, string slice, and maps with
-// string values.  markstruct uses `github.com/yuin/goldmark` to render 
+// string values.  markstruct uses `github.com/yuin/goldmark` to render
 // Markdown, and allows for custom goldmark.Markdown objects and parse options.
 //
 // Fields within a struct that should be converted should be annotated with the
