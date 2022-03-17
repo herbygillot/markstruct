@@ -1,12 +1,13 @@
-// markstruct converts a struct's string fields from Markdown to HTML in-place.
+// Package markstruct converts a struct's string fields from Markdown to HTML
+// in-place.
 //
 // markstruct will take a pointer to a struct, and scan for tagged string fields,
 // then render the value of these fields as Markdown to HTML in-place. That is to
 // say the value of each field itself will be changed within the struct to be the HTML
 // result of rendering the original field's value as Markdown.  markstruct targets
-// fields whose type are string, pointer to string, string slice, and maps with string values.
-// markstruct uses `github.com/yuin/goldmark` to render Markdown, and allows for
-// custom goldmark.Markdown objects and parse options.
+// fields whose type are string, pointer to string, string slice, and maps with
+// string values.  markstruct uses `github.com/yuin/goldmark` to render 
+// Markdown, and allows for custom goldmark.Markdown objects and parse options.
 //
 // Fields within a struct that should be converted should be annotated with the
 // tag `markdown:"on"`
@@ -28,8 +29,8 @@
 //   fmt.Println(doc.Title) // "Doc *1*"
 //   fmt.Println(doc.Body)  // "<p>This is <em>emphasis</em>.</p>"
 //
-// markstruct can optionally modify all struct fields of relevant type, including
-// those without this tag.
+// markstruct can optionally modify all struct string fields unequivocally,
+// ignoring the presence of this tag.
 package markstruct
 
 import (
